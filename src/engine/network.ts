@@ -5,6 +5,11 @@ type RawNetworkListener = (rawMessage: string) => void;
 class InnerPipe {
   innerListeners: RawNetworkListener[] = [];
   outerListeners: RawNetworkListener[] = [];
+  linkParams: NetworkLinkParams;
+
+  constructor(linkParams: NetworkLinkParams) {
+    this.linkParams = linkParams;
+  }
 
   send(message: string): void {
     for (const outerListener of this.outerListeners) {
@@ -18,9 +23,15 @@ class InnerPipe {
 
   pipe(anotherInnerPipe: InnerPipe) {
     this.outerListeners.push((message) => {
-      for (const innerListener of anotherInnerPipe.innerListeners) {
-        innerListener(message);
-      }
+      const delay =
+        this.linkParams.avgDelay +
+        2 * (Math.random() - 0.5) * this.linkParams.spread;
+
+      window.setTimeout(() => {
+        for (const innerListener of anotherInnerPipe.innerListeners) {
+          innerListener(message);
+        }
+      }, delay);
     });
   }
 }
@@ -50,13 +61,18 @@ export class NetworkInterface {
   }
 }
 
+type NetworkLinkParams = {
+  avgDelay: number;
+  spread: number;
+};
+
 export class NetworkLink {
   node1: NetworkInterface;
   node2: NetworkInterface;
 
-  constructor() {
-    const innerPipe1 = new InnerPipe();
-    const innerPipe2 = new InnerPipe();
+  constructor({ avgDelay, spread }: NetworkLinkParams) {
+    const innerPipe1 = new InnerPipe({ avgDelay, spread });
+    const innerPipe2 = new InnerPipe({ avgDelay, spread });
 
     innerPipe1.pipe(innerPipe2);
     innerPipe2.pipe(innerPipe1);

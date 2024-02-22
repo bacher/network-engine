@@ -73,6 +73,13 @@ export class Client {
     this.gameState!.players.find(
       (player) => player.playerId === this.playerId,
     )!.position = state.position;
+
+    this.networkInterface.send({
+      type: 'PLAYER_POSITION_UPDATE',
+      data: {
+        position: state.position,
+      },
+    });
   }
 
   destroy() {

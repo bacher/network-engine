@@ -3,8 +3,14 @@ import { NetworkLink } from './network.ts';
 import { Server } from './Server.ts';
 
 export function bootstrap() {
-  const player1Server = new NetworkLink();
-  const player2Server = new NetworkLink();
+  const player1Server = new NetworkLink({
+    avgDelay: 32,
+    spread: 5,
+  });
+  const player2Server = new NetworkLink({
+    avgDelay: 32,
+    spread: 5,
+  });
 
   const player1 = new Client(player1Server.node1);
   const player2 = new Client(player2Server.node1);

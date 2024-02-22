@@ -1,5 +1,5 @@
 import { NetworkInterface } from './network.ts';
-import { GameState, NetworkMessage } from './types.ts';
+import { GameState, NetworkMessage, PlayerState } from './types.ts';
 
 type ServerPlayerRepresentation = {
   playerId: string;
@@ -25,14 +25,16 @@ export class Server {
       networkInterface,
     });
 
-    this.gameState.players.push({
+    const player: PlayerState = {
       playerId,
       color: COLORS[this.gameState.players.length % COLORS.length],
       position: {
         x: 100 * (Math.random() - 0.5),
         y: 100 * (Math.random() - 0.5),
       },
-    });
+    };
+
+    this.gameState.players.push(player);
 
     networkInterface.send({
       type: 'INITIAL',
@@ -41,6 +43,19 @@ export class Server {
         gameState: this.gameState,
       },
     });
+
+    networkInterface.onMessage((message) => {
+      this.onPlayerMessage(player, message);
+    });
+  }
+
+  onPlayerMessage(playerState: PlayerState, message: NetworkMessage): void {
+    switch (message.type) {
+      case 'PLAYER_POSITION_UPDATE': {
+        playerState.position = message.data.position;
+        break;
+      }
+    }
   }
 
   startGameLoop() {

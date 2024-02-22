@@ -30,4 +30,14 @@ export type MessageGameStateUpdate = {
   };
 };
 
-export type NetworkMessage = MessageInitial | MessageGameStateUpdate;
+export type MessagePlayerPositionUpdate = {
+  type: 'PLAYER_POSITION_UPDATE';
+  data: {
+    position: Position;
+  };
+};
+
+export type NetworkMessage =
+  | MessageInitial
+  | MessageGameStateUpdate
+  | MessagePlayerPositionUpdate;
