@@ -34,16 +34,16 @@ export default function App() {
 
   return (
     <div className={styles.root}>
-      <div>
-        <h2>Player 1</h2>
+      <div className={styles.section}>
+        <h2 className={styles.sectionHeader}>Player 1</h2>
         <StateVisualizer getGameState={() => ref.current?.player1.gameState} />
       </div>
-      <div>
-        <h2>Game Server</h2>
+      <div className={styles.section}>
+        <h2 className={styles.sectionHeader}>Game Server</h2>
         <StateVisualizer getGameState={() => ref.current?.server.gameState} />
       </div>
-      <div>
-        <h2>Player 2</h2>
+      <div className={styles.section}>
+        <h2 className={styles.sectionHeader}>Player 2</h2>
         <StateVisualizer getGameState={() => ref.current?.player2.gameState} />
       </div>
     </div>

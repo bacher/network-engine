@@ -8,3 +8,13 @@
     flex-shrink: 0;
   }
 }
+
+.section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sectionHeader {
+  text-align: center;
+}
