@@ -1,16 +1,15 @@
 import { Client } from './Client.ts';
-import { NetworkLink } from './network.ts';
+import { NetworkLink, NetworkLinkParams } from './network.ts';
 import { Server } from './Server.ts';
 
+const defaultLinkParams: NetworkLinkParams = {
+  avgDelay: 32,
+  spread: 5,
+};
+
 export function bootstrap() {
-  const player1Server = new NetworkLink({
-    avgDelay: 32,
-    spread: 5,
-  });
-  const player2Server = new NetworkLink({
-    avgDelay: 32,
-    spread: 5,
-  });
+  const player1Server = new NetworkLink(defaultLinkParams);
+  const player2Server = new NetworkLink(defaultLinkParams);
 
   const player1 = new Client(player1Server.client);
   const player2 = new Client(player2Server.client);

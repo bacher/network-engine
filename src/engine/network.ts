@@ -6,10 +6,20 @@ import {
 
 type RawNetworkListener = (rawMessage: string) => void;
 
+type Packet = {
+  messageId: number;
+  message: string;
+};
+
 class UnderlyingTransport {
   internalListeners: RawNetworkListener[] = [];
   externalListeners: RawNetworkListener[] = [];
   linkParams: NetworkLinkParams;
+
+  private pipedTransport: UnderlyingTransport | undefined;
+  private sendingQueue: Packet[] = [];
+  private lastPacketId = 0;
+  private lastSentPacketId = 0;
 
   constructor(linkParams: NetworkLinkParams) {
     this.linkParams = linkParams;
@@ -25,18 +35,63 @@ class UnderlyingTransport {
     this.internalListeners.push(callback);
   }
 
+  private deliverMessage(packet: Packet): void {
+    if (!this.pipedTransport) {
+      throw new Error('Unpiped transport');
+    }
+
+    for (const innerListener of this.pipedTransport.internalListeners) {
+      innerListener(packet.message);
+    }
+
+    this.lastSentPacketId = packet.messageId;
+  }
+
   pipe(transport: UnderlyingTransport) {
+    this.pipedTransport = transport;
+
     this.externalListeners.push((message) => {
-      const delay =
+      const delay = Math.max(
+        0,
         this.linkParams.avgDelay +
-        2 * (Math.random() - 0.5) * this.linkParams.spread;
+          2 * (Math.random() - 0.5) * this.linkParams.spread,
+      );
+
+      this.lastPacketId += 1;
+
+      const item = {
+        messageId: this.lastPacketId,
+        message,
+      };
 
       window.setTimeout(() => {
-        for (const innerListener of transport.internalListeners) {
-          innerListener(message);
+        if (this.lastSentPacketId === item.messageId - 1) {
+          this.deliverMessage(item);
+          this.emptyQueue();
+        } else {
+          this.sendingQueue.push(item);
         }
       }, delay);
     });
+  }
+
+  private emptyQueue() {
+    if (this.sendingQueue.length === 0) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      for (let i = 0; i < this.sendingQueue.length; i++) {
+        const item = this.sendingQueue[i];
+
+        if (this.lastSentPacketId === item.messageId - 1) {
+          this.deliverMessage(item);
+          this.sendingQueue.splice(i, 1);
+          this.emptyQueue();
+          return;
+        }
+      }
+    }, 1);
   }
 }
 
@@ -65,7 +120,7 @@ export class NetworkInterface<SendMessage, ReceiveMessage> {
   }
 }
 
-type NetworkLinkParams = {
+export type NetworkLinkParams = {
   avgDelay: number;
   spread: number;
 };

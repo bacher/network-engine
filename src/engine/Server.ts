@@ -72,7 +72,7 @@ export class Server {
   }
 
   startGameLoop() {
-    this.gameLoopIntervalId = setInterval(() => {
+    this.gameLoopIntervalId = window.setInterval(() => {
       if (this.onlinePlayers.length === 0) {
         return;
       }
@@ -87,7 +87,7 @@ export class Server {
       for (const player of this.onlinePlayers) {
         player.networkInterface.send(message);
       }
-    }, 10);
+    }, 33.33);
   }
 
   destroy() {
