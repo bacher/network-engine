@@ -1,23 +1,31 @@
-import { GameState, NetworkMessage, PlayerState } from './types.ts';
+import {
+  GameState,
+  ServerNetworkMessage,
+  PlayerState,
+  ClientNetworkMessage,
+} from './types.ts';
 import { NetworkInterface } from './network.ts';
 
+type ClientNetworkInterface = NetworkInterface<
+  ClientNetworkMessage,
+  ServerNetworkMessage
+>;
+
 export class Client {
-  networkInterface: NetworkInterface;
+  networkInterface: ClientNetworkInterface;
   serverGameState: GameState | undefined;
   gameState: GameState | undefined;
   playerState: PlayerState | undefined;
   playerId: string | undefined;
   animationFrameId: number | undefined;
 
-  constructor(networkInterface: NetworkInterface) {
+  constructor(networkInterface: ClientNetworkInterface) {
     this.networkInterface = networkInterface;
 
     this.networkInterface.onMessage((message) => this.onMessage(message));
   }
 
-  onMessage(message: NetworkMessage): void {
-    // console.log(`Player ${this.playerId} received message:`, message);
-
+  onMessage(message: ServerNetworkMessage): void {
     switch (message.type) {
       case 'INITIAL': {
         this.playerId = message.data.playerId;

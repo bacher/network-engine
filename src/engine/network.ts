@@ -1,10 +1,14 @@
-import { NetworkListener, NetworkMessage } from './types.ts';
+import {
+  ClientNetworkMessage,
+  NetworkListener,
+  ServerNetworkMessage,
+} from './types.ts';
 
 type RawNetworkListener = (rawMessage: string) => void;
 
-class InnerPipe {
-  innerListeners: RawNetworkListener[] = [];
-  outerListeners: RawNetworkListener[] = [];
+class UnderlyingTransport {
+  internalListeners: RawNetworkListener[] = [];
+  externalListeners: RawNetworkListener[] = [];
   linkParams: NetworkLinkParams;
 
   constructor(linkParams: NetworkLinkParams) {
@@ -12,23 +16,23 @@ class InnerPipe {
   }
 
   send(message: string): void {
-    for (const outerListener of this.outerListeners) {
+    for (const outerListener of this.externalListeners) {
       outerListener(message);
     }
   }
 
   onMessage(callback: RawNetworkListener): void {
-    this.innerListeners.push(callback);
+    this.internalListeners.push(callback);
   }
 
-  pipe(anotherInnerPipe: InnerPipe) {
-    this.outerListeners.push((message) => {
+  pipe(transport: UnderlyingTransport) {
+    this.externalListeners.push((message) => {
       const delay =
         this.linkParams.avgDelay +
         2 * (Math.random() - 0.5) * this.linkParams.spread;
 
       window.setTimeout(() => {
-        for (const innerListener of anotherInnerPipe.innerListeners) {
+        for (const innerListener of transport.internalListeners) {
           innerListener(message);
         }
       }, delay);
@@ -36,15 +40,15 @@ class InnerPipe {
   }
 }
 
-export class NetworkInterface {
-  listeners: NetworkListener[] = [];
+export class NetworkInterface<SendMessage, ReceiveMessage> {
+  listeners: NetworkListener<ReceiveMessage>[] = [];
 
-  innerPipe: InnerPipe;
+  transport: UnderlyingTransport;
 
-  constructor(innerPipe: InnerPipe) {
-    this.innerPipe = innerPipe;
-    this.innerPipe.onMessage((rawMessage) => {
-      const message = JSON.parse(rawMessage) as NetworkMessage;
+  constructor(transport: UnderlyingTransport) {
+    this.transport = transport;
+    this.transport.onMessage((rawMessage) => {
+      const message = JSON.parse(rawMessage) as ReceiveMessage;
 
       for (const listener of this.listeners) {
         listener(message);
@@ -52,12 +56,12 @@ export class NetworkInterface {
     });
   }
 
-  onMessage(listener: NetworkListener): void {
+  onMessage(listener: NetworkListener<ReceiveMessage>): void {
     this.listeners.push(listener);
   }
 
-  send(message: NetworkMessage): void {
-    this.innerPipe.send(JSON.stringify(message));
+  send(message: SendMessage): void {
+    this.transport.send(JSON.stringify(message));
   }
 }
 
@@ -67,17 +71,17 @@ type NetworkLinkParams = {
 };
 
 export class NetworkLink {
-  node1: NetworkInterface;
-  node2: NetworkInterface;
+  client: NetworkInterface<ClientNetworkMessage, ServerNetworkMessage>;
+  server: NetworkInterface<ServerNetworkMessage, ClientNetworkMessage>;
 
   constructor({ avgDelay, spread }: NetworkLinkParams) {
-    const innerPipe1 = new InnerPipe({ avgDelay, spread });
-    const innerPipe2 = new InnerPipe({ avgDelay, spread });
+    const transport1 = new UnderlyingTransport({ avgDelay, spread });
+    const transport2 = new UnderlyingTransport({ avgDelay, spread });
 
-    innerPipe1.pipe(innerPipe2);
-    innerPipe2.pipe(innerPipe1);
+    transport1.pipe(transport2);
+    transport2.pipe(transport1);
 
-    this.node1 = new NetworkInterface(innerPipe1);
-    this.node2 = new NetworkInterface(innerPipe2);
+    this.client = new NetworkInterface(transport1);
+    this.server = new NetworkInterface(transport2);
   }
 }

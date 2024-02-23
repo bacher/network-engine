@@ -1,9 +1,19 @@
 import { NetworkInterface } from './network.ts';
-import { GameState, NetworkMessage, PlayerState } from './types.ts';
+import {
+  GameState,
+  ServerNetworkMessage,
+  PlayerState,
+  ClientNetworkMessage,
+} from './types.ts';
+
+type ServerNetworkInterface = NetworkInterface<
+  ServerNetworkMessage,
+  ClientNetworkMessage
+>;
 
 type ServerPlayerRepresentation = {
   playerId: string;
-  networkInterface: NetworkInterface;
+  networkInterface: ServerNetworkInterface;
 };
 
 const COLORS = ['red', 'blue', 'yellow', 'orange'];
@@ -16,7 +26,7 @@ export class Server {
     players: [],
   };
 
-  attachPlayerLink(networkInterface: NetworkInterface): void {
+  attachPlayerLink(networkInterface: ServerNetworkInterface): void {
     this.lastPlayerId += 1;
     const playerId = `id:${this.lastPlayerId}`;
 
@@ -49,7 +59,10 @@ export class Server {
     });
   }
 
-  onPlayerMessage(playerState: PlayerState, message: NetworkMessage): void {
+  onPlayerMessage(
+    playerState: PlayerState,
+    message: ClientNetworkMessage,
+  ): void {
     switch (message.type) {
       case 'PLAYER_POSITION_UPDATE': {
         playerState.position = message.data.position;
@@ -64,7 +77,7 @@ export class Server {
         return;
       }
 
-      const message: NetworkMessage = {
+      const message: ServerNetworkMessage = {
         type: 'GAME_STATE_UPDATE',
         data: {
           gameState: this.gameState,

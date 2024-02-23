@@ -12,15 +12,15 @@ export function bootstrap() {
     spread: 5,
   });
 
-  const player1 = new Client(player1Server.node1);
-  const player2 = new Client(player2Server.node1);
+  const player1 = new Client(player1Server.client);
+  const player2 = new Client(player2Server.client);
 
   const server = new Server();
 
   server.startGameLoop();
 
-  server.attachPlayerLink(player1Server.node2);
-  server.attachPlayerLink(player2Server.node2);
+  server.attachPlayerLink(player1Server.server);
+  server.attachPlayerLink(player2Server.server);
 
   player1.startCircling();
 

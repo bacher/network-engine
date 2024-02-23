@@ -13,9 +13,9 @@ export type GameState = {
   players: PlayerState[];
 };
 
-export type NetworkListener = (message: NetworkMessage) => void;
+export type NetworkListener<Message> = (message: Message) => void;
 
-export type MessageInitial = {
+export type ServerMessageInitial = {
   type: 'INITIAL';
   data: {
     playerId: string;
@@ -23,21 +23,22 @@ export type MessageInitial = {
   };
 };
 
-export type MessageGameStateUpdate = {
+export type ServerMessageGameStateUpdate = {
   type: 'GAME_STATE_UPDATE';
   data: {
     gameState: GameState;
   };
 };
 
-export type MessagePlayerPositionUpdate = {
+export type ClientMessagePlayerPositionUpdate = {
   type: 'PLAYER_POSITION_UPDATE';
   data: {
     position: Position;
   };
 };
 
-export type NetworkMessage =
-  | MessageInitial
-  | MessageGameStateUpdate
-  | MessagePlayerPositionUpdate;
+export type ServerNetworkMessage =
+  | ServerMessageInitial
+  | ServerMessageGameStateUpdate;
+
+export type ClientNetworkMessage = ClientMessagePlayerPositionUpdate;
