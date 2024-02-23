@@ -53,8 +53,8 @@ class UnderlyingTransport {
     this.externalListeners.push((message) => {
       const delay = Math.max(
         0,
-        this.linkParams.avgDelay +
-          2 * (Math.random() - 0.5) * this.linkParams.spread,
+        this.linkParams.avgDelay *
+          (1 + 2 * (Math.random() - 0.5) * this.linkParams.spread),
       );
 
       this.lastPacketId += 1;

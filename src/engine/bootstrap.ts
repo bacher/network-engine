@@ -3,8 +3,8 @@ import { NetworkLink, NetworkLinkParams } from './network.ts';
 import { Server } from './Server.ts';
 
 const defaultLinkParams: NetworkLinkParams = {
-  avgDelay: 32,
-  spread: 5,
+  avgDelay: 100,
+  spread: 0.3,
 };
 
 export function bootstrap() {
