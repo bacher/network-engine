@@ -1,3 +1,5 @@
+import throttle from 'lodash-es/throttle';
+
 import { NetworkInterface } from './network.ts';
 import {
   GameState,
@@ -5,6 +7,11 @@ import {
   PlayerState,
   ClientNetworkMessage,
 } from './types.ts';
+import {
+  CLIENT_UPDATES_INTERVAL,
+  CLIENT_UPDATES_RATE,
+  SERVER_UPDATES_INTERVAL,
+} from './consts.ts';
 
 type ServerNetworkInterface = NetworkInterface<
   ServerNetworkMessage,
@@ -13,6 +20,11 @@ type ServerNetworkInterface = NetworkInterface<
 
 type ServerPlayerRepresentation = {
   playerId: string;
+  playerState: PlayerState;
+  lastUpdateTime: number | undefined;
+  updateTimeSpreadList: number[];
+  updateTimeSpreadListIndex: number;
+  updateTimeSpread: number;
   networkInterface: ServerNetworkInterface;
 };
 
@@ -30,12 +42,7 @@ export class Server {
     this.lastPlayerId += 1;
     const playerId = `id:${this.lastPlayerId}`;
 
-    this.onlinePlayers.push({
-      playerId,
-      networkInterface,
-    });
-
-    const player: PlayerState = {
+    const playerState: PlayerState = {
       playerId,
       color: COLORS[this.gameState.players.length % COLORS.length],
       position: {
@@ -44,7 +51,19 @@ export class Server {
       },
     };
 
-    this.gameState.players.push(player);
+    const player: ServerPlayerRepresentation = {
+      playerId,
+      playerState,
+      lastUpdateTime: undefined,
+      updateTimeSpreadList: Array(CLIENT_UPDATES_RATE).fill(0) as number[],
+      updateTimeSpreadListIndex: 0,
+      updateTimeSpread: 0,
+      networkInterface,
+    };
+
+    this.onlinePlayers.push(player);
+
+    this.gameState.players.push(playerState);
 
     networkInterface.send({
       type: 'INITIAL',
@@ -60,12 +79,49 @@ export class Server {
   }
 
   onPlayerMessage(
-    playerState: PlayerState,
+    player: ServerPlayerRepresentation,
     message: ClientNetworkMessage,
   ): void {
     switch (message.type) {
       case 'PLAYER_POSITION_UPDATE': {
-        playerState.position = message.data.position;
+        const prevUpdateTime = player.lastUpdateTime;
+        player.lastUpdateTime = performance.now();
+        if (prevUpdateTime) {
+          const lastDelta = player.lastUpdateTime - prevUpdateTime;
+          const spread = CLIENT_UPDATES_INTERVAL - lastDelta;
+
+          player.updateTimeSpread +=
+            -player.updateTimeSpreadList[player.updateTimeSpreadListIndex] +
+            spread;
+
+          if (player.playerId === 'id:1') {
+            const min = player.updateTimeSpreadList.reduce(
+              (acc, value) => Math.min(acc, value),
+              0,
+            );
+
+            const max = player.updateTimeSpreadList.reduce(
+              (acc, value) => Math.max(acc, value),
+              0,
+            );
+
+            report`${player.playerId}
+              min spread: ${min}
+              max spread: ${max}
+              spread window: ${max - min}
+              spread bias: ${min + max}`;
+          }
+
+          player.updateTimeSpreadList[player.updateTimeSpreadListIndex] =
+            spread;
+
+          player.updateTimeSpreadListIndex += 1;
+          if (player.updateTimeSpreadListIndex === CLIENT_UPDATES_RATE) {
+            player.updateTimeSpreadListIndex = 0;
+          }
+        }
+
+        player.playerState.position = message.data.position;
         break;
       }
     }
@@ -87,7 +143,7 @@ export class Server {
       for (const player of this.onlinePlayers) {
         player.networkInterface.send(message);
       }
-    }, 33.33);
+    }, SERVER_UPDATES_INTERVAL);
   }
 
   destroy() {
@@ -97,3 +153,31 @@ export class Server {
     }
   }
 }
+
+function reportLogic(strings: TemplateStringsArray, ...args: unknown[]): void {
+  const reportNode = document.querySelector('.js-report');
+
+  if (!reportNode) {
+    return;
+  }
+
+  const stringBuilder = [];
+
+  for (let i = 0; i < strings.length; i += 1) {
+    stringBuilder.push(strings[i]);
+    if (i < args.length) {
+      const rawValue = args[i];
+      let value = rawValue;
+
+      if (typeof rawValue === 'number') {
+        value = rawValue.toFixed(1).padStart(6);
+      }
+
+      stringBuilder.push(value);
+    }
+  }
+
+  (reportNode as HTMLDivElement).innerText = stringBuilder.join('');
+}
+
+const report = throttle(reportLogic, 500);

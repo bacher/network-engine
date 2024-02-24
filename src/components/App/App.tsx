@@ -5,6 +5,7 @@ import { bootstrap } from '../../engine/bootstrap.ts';
 import { Server } from '../../engine/Server.ts';
 import { Client } from '../../engine/Client.ts';
 import styles from './App.module.css';
+import { ReportBlock } from '../ReportBlock/ReportBlock.tsx';
 
 export default function App() {
   const ref = useRef<{
@@ -46,6 +47,8 @@ export default function App() {
         <h2 className={styles.sectionHeader}>Player 2</h2>
         <StateVisualizer getGameState={() => ref.current?.player2.gameState} />
       </div>
+
+      <ReportBlock />
     </div>
   );
 }

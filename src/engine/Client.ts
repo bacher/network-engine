@@ -5,6 +5,7 @@ import {
   ClientNetworkMessage,
 } from './types.ts';
 import { NetworkInterface } from './network.ts';
+import { CLIENT_UPDATES_RATE } from './consts.ts';
 
 type ClientNetworkInterface = NetworkInterface<
   ClientNetworkMessage,
@@ -18,6 +19,7 @@ export class Client {
   playerState: PlayerState | undefined;
   playerId: string | undefined;
   animationFrameId: number | undefined;
+  stateSyncIntervalId: number | undefined;
 
   constructor(networkInterface: ClientNetworkInterface) {
     this.networkInterface = networkInterface;
@@ -34,6 +36,7 @@ export class Client {
         this.playerState = message.data.gameState.players.find(
           (player) => player.playerId === this.playerId,
         );
+        this.initStateSync();
         break;
       }
 
@@ -44,14 +47,24 @@ export class Client {
             player.playerId === this.playerId ? this.playerState! : player,
           ),
         };
-        // console.log(
-        //   this.playerId,
-        //   'Game state override',
-        //   this.gameState.players.length,
-        // );
         break;
       }
     }
+  }
+
+  initStateSync() {
+    if (this.stateSyncIntervalId) {
+      return;
+    }
+
+    this.stateSyncIntervalId = window.setInterval(() => {
+      this.networkInterface.send({
+        type: 'PLAYER_POSITION_UPDATE',
+        data: {
+          position: this.playerState!.position,
+        },
+      });
+    }, 1000 / CLIENT_UPDATES_RATE);
   }
 
   startCircling() {
@@ -81,19 +94,17 @@ export class Client {
     this.gameState!.players.find(
       (player) => player.playerId === this.playerId,
     )!.position = state.position;
-
-    this.networkInterface.send({
-      type: 'PLAYER_POSITION_UPDATE',
-      data: {
-        position: state.position,
-      },
-    });
   }
 
   destroy() {
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = undefined;
+    }
+
+    if (this.stateSyncIntervalId) {
+      window.clearInterval(this.stateSyncIntervalId);
+      this.stateSyncIntervalId = undefined;
     }
   }
 }

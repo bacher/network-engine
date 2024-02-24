@@ -91,7 +91,7 @@ class UnderlyingTransport {
           return;
         }
       }
-    }, 1);
+    }, 0);
   }
 }
 
