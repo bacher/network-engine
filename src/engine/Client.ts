@@ -5,7 +5,8 @@ import {
   ClientNetworkMessage,
 } from './types.ts';
 import { NetworkInterface } from './network.ts';
-import { CLIENT_UPDATES_RATE } from './consts.ts';
+import { CLIENT_UPDATES_INTERVAL } from './consts.ts';
+import { IntervalTimer } from './timers.ts';
 
 type ClientNetworkInterface = NetworkInterface<
   ClientNetworkMessage,
@@ -19,7 +20,7 @@ export class Client {
   playerState: PlayerState | undefined;
   playerId: string | undefined;
   animationFrameId: number | undefined;
-  stateSyncIntervalId: number | undefined;
+  stateSyncIntervalTimer: IntervalTimer | undefined;
 
   constructor(networkInterface: ClientNetworkInterface) {
     this.networkInterface = networkInterface;
@@ -53,18 +54,23 @@ export class Client {
   }
 
   initStateSync() {
-    if (this.stateSyncIntervalId) {
+    if (this.stateSyncIntervalTimer) {
       return;
     }
 
-    this.stateSyncIntervalId = window.setInterval(() => {
-      this.networkInterface.send({
-        type: 'PLAYER_POSITION_UPDATE',
-        data: {
-          position: this.playerState!.position,
-        },
-      });
-    }, 1000 / CLIENT_UPDATES_RATE);
+    this.stateSyncIntervalTimer = new IntervalTimer(
+      CLIENT_UPDATES_INTERVAL,
+      () => {
+        this.networkInterface.send({
+          type: 'PLAYER_POSITION_UPDATE',
+          data: {
+            position: this.playerState!.position,
+          },
+        });
+      },
+    );
+
+    this.stateSyncIntervalTimer.start();
   }
 
   startCircling() {
@@ -102,9 +108,9 @@ export class Client {
       this.animationFrameId = undefined;
     }
 
-    if (this.stateSyncIntervalId) {
-      window.clearInterval(this.stateSyncIntervalId);
-      this.stateSyncIntervalId = undefined;
+    if (this.stateSyncIntervalTimer) {
+      this.stateSyncIntervalTimer.stop();
+      this.stateSyncIntervalTimer = undefined;
     }
   }
 }

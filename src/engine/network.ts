@@ -85,6 +85,7 @@ class UnderlyingTransport {
         const item = this.sendingQueue[i];
 
         if (this.lastSentPacketId === item.messageId - 1) {
+          console.log('send from queue');
           this.deliverMessage(item);
           this.sendingQueue.splice(i, 1);
           this.emptyQueue();

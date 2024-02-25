@@ -12,6 +12,7 @@ import {
   CLIENT_UPDATES_RATE,
   SERVER_UPDATES_INTERVAL,
 } from './consts.ts';
+import { IntervalTimer } from './timers.ts';
 
 type ServerNetworkInterface = NetworkInterface<
   ServerNetworkMessage,
@@ -33,7 +34,7 @@ const COLORS = ['red', 'blue', 'yellow', 'orange'];
 export class Server {
   onlinePlayers: ServerPlayerRepresentation[] = [];
   lastPlayerId = 0;
-  gameLoopIntervalId: number | undefined;
+  gameLoopIntervalTimer: IntervalTimer | undefined;
   gameState: GameState = {
     players: [],
   };
@@ -105,11 +106,16 @@ export class Server {
               0,
             );
 
+            const overallBias = player.updateTimeSpreadList.reduce(
+              (acc, value) => acc + value,
+            );
+
             report`${player.playerId}
               min spread: ${min}
               max spread: ${max}
               spread window: ${max - min}
-              spread bias: ${min + max}`;
+              spread bias: ${(min + max) / 2}
+              spread sum bias: ${overallBias}`;
           }
 
           player.updateTimeSpreadList[player.updateTimeSpreadListIndex] =
@@ -128,28 +134,33 @@ export class Server {
   }
 
   startGameLoop() {
-    this.gameLoopIntervalId = window.setInterval(() => {
-      if (this.onlinePlayers.length === 0) {
-        return;
-      }
+    this.gameLoopIntervalTimer = new IntervalTimer(
+      SERVER_UPDATES_INTERVAL,
+      () => {
+        if (this.onlinePlayers.length === 0) {
+          return;
+        }
 
-      const message: ServerNetworkMessage = {
-        type: 'GAME_STATE_UPDATE',
-        data: {
-          gameState: this.gameState,
-        },
-      };
+        const message: ServerNetworkMessage = {
+          type: 'GAME_STATE_UPDATE',
+          data: {
+            gameState: this.gameState,
+          },
+        };
 
-      for (const player of this.onlinePlayers) {
-        player.networkInterface.send(message);
-      }
-    }, SERVER_UPDATES_INTERVAL);
+        for (const player of this.onlinePlayers) {
+          player.networkInterface.send(message);
+        }
+      },
+    );
+
+    this.gameLoopIntervalTimer.start();
   }
 
   destroy() {
-    if (this.gameLoopIntervalId) {
-      window.clearInterval(this.gameLoopIntervalId);
-      this.gameLoopIntervalId = undefined;
+    if (this.gameLoopIntervalTimer) {
+      this.gameLoopIntervalTimer.stop();
+      this.gameLoopIntervalTimer = undefined;
     }
   }
 }

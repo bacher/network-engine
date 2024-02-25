@@ -4,7 +4,7 @@ import { Server } from './Server.ts';
 
 const defaultLinkParams: NetworkLinkParams = {
   avgDelay: 100,
-  spread: 0.3,
+  spread: 0.15,
 };
 
 export function bootstrap() {
@@ -16,12 +16,14 @@ export function bootstrap() {
 
   const server = new Server();
 
-  server.startGameLoop();
+  window.setTimeout(() => {
+    server.startGameLoop();
 
-  server.attachPlayerLink(player1Server.server);
-  server.attachPlayerLink(player2Server.server);
+    server.attachPlayerLink(player1Server.server);
+    server.attachPlayerLink(player2Server.server);
 
-  player1.startCircling();
+    player1.startCircling();
+  }, 50);
 
   return {
     server,
