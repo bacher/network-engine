@@ -204,33 +204,36 @@ export class Server {
         continue;
       }
 
+      if (tickId < player.closestTickIdInBuffer) {
+        continue;
+      }
+
       player.bufferExtraSizeHistory.next(
         player.buffer.length - 1 + (player.interpolation ? -1 : 0),
       );
 
-      if (player.buffer.length === 0) {
-        console.warn(`empty buffer for player ${player.playerId}`);
-        continue;
-      }
-
       if (tickId !== player.closestTickIdInBuffer) {
-        if (player.closestTickIdInBuffer < tickId) {
-          const shift = Math.max(
-            0,
-            SERVER_INITIAL_BUFFER_OFFSET - player.buffer.length,
-          );
-          player.closestTickIdInBuffer = tickId + shift;
-
-          console.error(
-            `resetting buffer by ${shift} ticks for ${player.playerId}`,
-          );
-        } else {
-          console.error(
-            `closestTickIdInBuffer ${player.closestTickIdInBuffer} != current tick ${tickId} for ${player.playerId}`,
-          );
-        }
-
-        continue;
+        // if (player.closestTickIdInBuffer < tickId) {
+        //   const shift = Math.max(
+        //     0,
+        //     SERVER_INITIAL_BUFFER_OFFSET - player.buffer.length,
+        //   );
+        //   player.closestTickIdInBuffer = tickId + shift;
+        //   player.interpolation = 0;
+        //
+        //   console.error(
+        //     `resetting buffer by ${shift} ticks for ${player.playerId}`,
+        //   );
+        // } else {
+        //   console.error(
+        //     `closestTickIdInBuffer ${player.closestTickIdInBuffer} != current tick ${tickId} for ${player.playerId}`,
+        //   );
+        // }
+        //
+        // continue;
+        throw new Error(
+          `closestTickIdInBuffer ${player.closestTickIdInBuffer} != current tick ${tickId} for ${player.playerId}`,
+        );
       }
 
       const playerUpdate = player.buffer.shift();
@@ -297,7 +300,8 @@ export class Server {
         }
       } else {
         player.interpolation = 0;
-        console.log(`missing player state update for ${player.playerId}`);
+        // TODO: Add extrapolation logic
+        console.warn(`missing player state update for ${player.playerId}`);
       }
 
       player.closestTickIdInBuffer += 1;
