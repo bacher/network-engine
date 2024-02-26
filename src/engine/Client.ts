@@ -74,8 +74,8 @@ export class Client {
   }
 
   startCircling() {
+    this.circlingLogic();
     this.animationFrameId = requestAnimationFrame(() => {
-      this.circlingLogic();
       this.startCircling();
     });
   }

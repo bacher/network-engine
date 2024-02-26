@@ -1,26 +1,32 @@
 import throttle from 'lodash-es/throttle';
 
+import { CyclicCounter } from '../utils/CyclicCounter.ts';
+import { lerpPosition } from '../utils/lerp.ts';
+
 import { NetworkInterface } from './network.ts';
 import {
   GameState,
   ServerNetworkMessage,
   PlayerState,
   ClientNetworkMessage,
-  Position,
+  ClientMessagePlayerPositionUpdate,
 } from './types.ts';
 import {
   CLIENT_UPDATES_INTERVAL,
   CLIENT_UPDATES_RATE,
   SERVER_INITIAL_BUFFER_OFFSET,
   SERVER_UPDATES_INTERVAL,
+  SKIP_TICK_INTERPOLATION_STEP,
+  SKIP_TICK_PREPARATION_TICKS,
 } from './consts.ts';
 import { IntervalTimer } from './timers.ts';
-import { CyclicCounter } from '../utils/CyclicCounter.ts';
 
 type ServerNetworkInterface = NetworkInterface<
   ServerNetworkMessage,
   ClientNetworkMessage
 >;
+
+type PlayerUpdate = ClientMessagePlayerPositionUpdate['data'];
 
 type ServerPlayerRepresentation = {
   playerId: string;
@@ -30,9 +36,10 @@ type ServerPlayerRepresentation = {
   updateTimeSpreadListIndex: number;
   updateTimeSpread: number;
   networkInterface: ServerNetworkInterface;
-  buffer: { position: Position }[];
+  buffer: PlayerUpdate[];
   closestTickIdInBuffer: number | undefined;
   interpolation: number;
+  bufferExtraSizeHistory: CyclicCounter;
 };
 
 const COLORS = ['red', 'blue', 'yellow', 'orange'];
@@ -43,7 +50,7 @@ const incomingUpdatesCounter = new CyclicCounter();
 
 const bufferSizeCounter = new CyclicCounter();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any,@typescript-eslint/no-unsafe-member-access
-(window as any)._bufferSizeCounter = bufferSizeCounter;
+(window as any)._extraBufferSizeCounter = bufferSizeCounter;
 
 export class Server {
   onlinePlayers: ServerPlayerRepresentation[] = [];
@@ -77,6 +84,7 @@ export class Server {
       buffer: [],
       closestTickIdInBuffer: undefined,
       interpolation: 0,
+      bufferExtraSizeHistory: new CyclicCounter(SKIP_TICK_PREPARATION_TICKS),
     };
 
     this.onlinePlayers.push(player);
@@ -187,23 +195,112 @@ export class Server {
     const tickId = this.gameLoopIntervalTimer!.getTickId();
 
     for (const player of this.onlinePlayers) {
-      if (
-        player.closestTickIdInBuffer !== undefined &&
-        tickId === player.closestTickIdInBuffer
-      ) {
-        const playerUpdate = player.buffer.shift();
-
-        if (playerUpdate) {
-          player.playerState.position = playerUpdate.position;
-
-          if (player.playerId === 'id:1') {
-            bufferSizeCounter.next(player.buffer.length);
-          }
-        } else {
-          console.log(`missing player state update for ${player.playerId}`);
-        }
-        player.closestTickIdInBuffer += 1;
+      // TODO: temporary
+      if (player.playerId !== 'id:1') {
+        continue;
       }
+
+      if (player.closestTickIdInBuffer === undefined) {
+        continue;
+      }
+
+      player.bufferExtraSizeHistory.next(
+        player.buffer.length - 1 + (player.interpolation ? -1 : 0),
+      );
+
+      if (player.buffer.length === 0) {
+        console.warn(`empty buffer for player ${player.playerId}`);
+        continue;
+      }
+
+      if (tickId !== player.closestTickIdInBuffer) {
+        if (player.closestTickIdInBuffer < tickId) {
+          const shift = Math.max(
+            0,
+            SERVER_INITIAL_BUFFER_OFFSET - player.buffer.length,
+          );
+          player.closestTickIdInBuffer = tickId + shift;
+
+          console.error(
+            `resetting buffer by ${shift} ticks for ${player.playerId}`,
+          );
+        } else {
+          console.error(
+            `closestTickIdInBuffer ${player.closestTickIdInBuffer} != current tick ${tickId} for ${player.playerId}`,
+          );
+        }
+
+        continue;
+      }
+
+      const playerUpdate = player.buffer.shift();
+
+      if (playerUpdate) {
+        if (player.interpolation && player.buffer.length === 0) {
+          console.warn(
+            `resetting interpolation to 0 because of empty buffer for player ${player.playerId}`,
+          );
+          player.interpolation = 0;
+        }
+
+        // player.buffer.length >= 3
+        if (!player.interpolation) {
+          let haveExtraFrame = true;
+
+          for (const extra of player.bufferExtraSizeHistory.buffer) {
+            if (extra < 1) {
+              haveExtraFrame = false;
+              break;
+            }
+          }
+
+          if (haveExtraFrame) {
+            player.interpolation = SKIP_TICK_INTERPOLATION_STEP;
+
+            for (
+              let i = 0;
+              i < player.bufferExtraSizeHistory.buffer.length;
+              i += 1
+            ) {
+              player.bufferExtraSizeHistory.buffer[i] -= 1;
+            }
+          }
+        }
+
+        let finalState: PlayerUpdate = playerUpdate;
+
+        if (player.interpolation) {
+          const nextUpdate = player.buffer[0];
+
+          finalState = {
+            position: lerpPosition(
+              playerUpdate.position,
+              nextUpdate.position,
+              player.interpolation,
+            ),
+          };
+
+          player.interpolation += SKIP_TICK_INTERPOLATION_STEP;
+
+          if (player.interpolation > 0.999) {
+            player.interpolation = 0;
+            player.buffer.shift();
+
+            console.log(`drop one buffer item for ${player.playerId}`);
+          }
+        }
+
+        player.playerState.position = finalState.position;
+
+        if (player.playerId === 'id:1') {
+          bufferSizeCounter.next(player.buffer.length);
+        }
+      } else {
+        player.interpolation = 0;
+        console.log(`missing player state update for ${player.playerId}`);
+      }
+
+      player.closestTickIdInBuffer += 1;
     }
   }
 
