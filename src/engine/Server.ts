@@ -31,6 +31,9 @@ type ServerPlayerRepresentation = {
 
 const COLORS = ['red', 'blue', 'yellow', 'orange'];
 
+(window as any).ll = Array(100).fill(0);
+(window as any).lll = 0;
+
 export class Server {
   onlinePlayers: ServerPlayerRepresentation[] = [];
   lastPlayerId = 0;
@@ -85,6 +88,10 @@ export class Server {
   ): void {
     switch (message.type) {
       case 'PLAYER_POSITION_UPDATE': {
+        if (player.playerId === 'id:1') {
+          ll[lll] += 1;
+        }
+
         const prevUpdateTime = player.lastUpdateTime;
         player.lastUpdateTime = performance.now();
         if (prevUpdateTime) {
@@ -137,6 +144,12 @@ export class Server {
     this.gameLoopIntervalTimer = new IntervalTimer(
       SERVER_UPDATES_INTERVAL,
       () => {
+        lll += 1;
+        if (lll === 100) {
+          lll = 0;
+        }
+        ll[lll] = 0;
+
         if (this.onlinePlayers.length === 0) {
           return;
         }

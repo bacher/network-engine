@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
 
-import { StateVisualizer } from '../StateVisualizer/StateVisualizer.tsx';
 import { bootstrap } from '../../engine/bootstrap.ts';
 import { Server } from '../../engine/Server.ts';
 import { Client } from '../../engine/Client.ts';
-import styles from './App.module.css';
+import { StateVisualizer } from '../StateVisualizer/StateVisualizer.tsx';
 import { ReportBlock } from '../ReportBlock/ReportBlock.tsx';
+import styles from './App.module.css';
 
 export default function App() {
   const ref = useRef<{
@@ -18,6 +18,7 @@ export default function App() {
     const {
       server,
       players: [player1, player2],
+      start,
     } = bootstrap();
 
     ref.current = {
@@ -26,7 +27,12 @@ export default function App() {
       player2,
     };
 
+    const delayedStartTimerId = window.setTimeout(() => {
+      start();
+    }, 50);
+
     return () => {
+      window.clearTimeout(delayedStartTimerId);
       player1.destroy();
       player2.destroy();
       server.destroy();

@@ -16,17 +16,16 @@ export function bootstrap() {
 
   const server = new Server();
 
-  window.setTimeout(() => {
-    server.startGameLoop();
-
-    server.attachPlayerLink(player1Server.server);
-    server.attachPlayerLink(player2Server.server);
-
-    player1.startCircling();
-  }, 50);
-
   return {
     server,
     players: [player1, player2],
+    start: () => {
+      server.startGameLoop();
+
+      server.attachPlayerLink(player1Server.server);
+      server.attachPlayerLink(player2Server.server);
+
+      player1.startCircling();
+    },
   };
 }
