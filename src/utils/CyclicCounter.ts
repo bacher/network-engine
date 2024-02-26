@@ -6,11 +6,11 @@ export class CyclicCounter {
     this.buffer[this.index] += value;
   }
 
-  next(): void {
+  next(value = 0): void {
     this.index += 1;
     if (this.index === 100) {
       this.index = 0;
     }
-    this.buffer[this.index] = 0;
+    this.buffer[this.index] = value;
   }
 }

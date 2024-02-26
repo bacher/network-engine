@@ -32,13 +32,18 @@ type ServerPlayerRepresentation = {
   networkInterface: ServerNetworkInterface;
   buffer: { position: Position }[];
   closestTickIdInBuffer: number | undefined;
+  interpolation: number;
 };
 
 const COLORS = ['red', 'blue', 'yellow', 'orange'];
 
-const counter = new CyclicCounter();
+const incomingUpdatesCounter = new CyclicCounter();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any,@typescript-eslint/no-unsafe-member-access
-(window as any)._counter = counter;
+(window as any)._counter = incomingUpdatesCounter;
+
+const bufferSizeCounter = new CyclicCounter();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any,@typescript-eslint/no-unsafe-member-access
+(window as any)._bufferSizeCounter = bufferSizeCounter;
 
 export class Server {
   onlinePlayers: ServerPlayerRepresentation[] = [];
@@ -71,6 +76,7 @@ export class Server {
       networkInterface,
       buffer: [],
       closestTickIdInBuffer: undefined,
+      interpolation: 0,
     };
 
     this.onlinePlayers.push(player);
@@ -105,7 +111,7 @@ export class Server {
         }
 
         if (player.playerId === 'id:1') {
-          counter.increase(1);
+          incomingUpdatesCounter.increase(1);
         }
 
         const prevUpdateTime = player.lastUpdateTime;
@@ -166,7 +172,7 @@ export class Server {
   }
 
   private tick() {
-    counter.next();
+    incomingUpdatesCounter.next();
 
     if (this.onlinePlayers.length === 0) {
       return;
@@ -189,6 +195,10 @@ export class Server {
 
         if (playerUpdate) {
           player.playerState.position = playerUpdate.position;
+
+          if (player.playerId === 'id:1') {
+            bufferSizeCounter.next(player.buffer.length);
+          }
         } else {
           console.log(`missing player state update for ${player.playerId}`);
         }
