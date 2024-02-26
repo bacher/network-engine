@@ -1,11 +1,7 @@
 import { Client } from './Client.ts';
-import { NetworkLink, NetworkLinkParams } from './network.ts';
+import { NetworkLink } from './network.ts';
 import { Server } from './Server.ts';
-
-const defaultLinkParams: NetworkLinkParams = {
-  avgDelay: 100,
-  spread: 0.15,
-};
+import { defaultLinkParams } from './consts.ts';
 
 export function bootstrap() {
   const player1Server = new NetworkLink(defaultLinkParams);

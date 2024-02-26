@@ -6,13 +6,16 @@ import {
   ServerNetworkMessage,
   PlayerState,
   ClientNetworkMessage,
+  Position,
 } from './types.ts';
 import {
   CLIENT_UPDATES_INTERVAL,
   CLIENT_UPDATES_RATE,
+  SERVER_INITIAL_BUFFER_OFFSET,
   SERVER_UPDATES_INTERVAL,
 } from './consts.ts';
 import { IntervalTimer } from './timers.ts';
+import { CyclicCounter } from '../utils/CyclicCounter.ts';
 
 type ServerNetworkInterface = NetworkInterface<
   ServerNetworkMessage,
@@ -27,12 +30,15 @@ type ServerPlayerRepresentation = {
   updateTimeSpreadListIndex: number;
   updateTimeSpread: number;
   networkInterface: ServerNetworkInterface;
+  buffer: { position: Position }[];
+  closestTickIdInBuffer: number | undefined;
 };
 
 const COLORS = ['red', 'blue', 'yellow', 'orange'];
 
-(window as any).ll = Array(100).fill(0);
-(window as any).lll = 0;
+const counter = new CyclicCounter();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any,@typescript-eslint/no-unsafe-member-access
+(window as any)._counter = counter;
 
 export class Server {
   onlinePlayers: ServerPlayerRepresentation[] = [];
@@ -63,6 +69,8 @@ export class Server {
       updateTimeSpreadListIndex: 0,
       updateTimeSpread: 0,
       networkInterface,
+      buffer: [],
+      closestTickIdInBuffer: undefined,
     };
 
     this.onlinePlayers.push(player);
@@ -88,8 +96,16 @@ export class Server {
   ): void {
     switch (message.type) {
       case 'PLAYER_POSITION_UPDATE': {
+        player.buffer.push(message.data);
+
+        if (player.closestTickIdInBuffer === undefined) {
+          player.closestTickIdInBuffer =
+            this.gameLoopIntervalTimer!.getTickId() +
+            SERVER_INITIAL_BUFFER_OFFSET;
+        }
+
         if (player.playerId === 'id:1') {
-          ll[lll] += 1;
+          counter.increase(1);
         }
 
         const prevUpdateTime = player.lastUpdateTime;
@@ -133,8 +149,6 @@ export class Server {
             player.updateTimeSpreadListIndex = 0;
           }
         }
-
-        player.playerState.position = message.data.position;
         break;
       }
     }
@@ -144,30 +158,56 @@ export class Server {
     this.gameLoopIntervalTimer = new IntervalTimer(
       SERVER_UPDATES_INTERVAL,
       () => {
-        lll += 1;
-        if (lll === 100) {
-          lll = 0;
-        }
-        ll[lll] = 0;
-
-        if (this.onlinePlayers.length === 0) {
-          return;
-        }
-
-        const message: ServerNetworkMessage = {
-          type: 'GAME_STATE_UPDATE',
-          data: {
-            gameState: this.gameState,
-          },
-        };
-
-        for (const player of this.onlinePlayers) {
-          player.networkInterface.send(message);
-        }
+        this.tick();
       },
     );
 
     this.gameLoopIntervalTimer.start();
+  }
+
+  private tick() {
+    counter.next();
+
+    if (this.onlinePlayers.length === 0) {
+      return;
+    }
+
+    this.applyTickChanges();
+
+    this.broadcastState();
+  }
+
+  private applyTickChanges() {
+    const tickId = this.gameLoopIntervalTimer!.getTickId();
+
+    for (const player of this.onlinePlayers) {
+      if (
+        player.closestTickIdInBuffer !== undefined &&
+        tickId === player.closestTickIdInBuffer
+      ) {
+        const playerUpdate = player.buffer.shift();
+
+        if (playerUpdate) {
+          player.playerState.position = playerUpdate.position;
+        } else {
+          console.log(`missing player state update for ${player.playerId}`);
+        }
+        player.closestTickIdInBuffer += 1;
+      }
+    }
+  }
+
+  private broadcastState() {
+    const message: ServerNetworkMessage = {
+      type: 'GAME_STATE_UPDATE',
+      data: {
+        gameState: this.gameState,
+      },
+    };
+
+    for (const player of this.onlinePlayers) {
+      player.networkInterface.send(message);
+    }
   }
 
   destroy() {

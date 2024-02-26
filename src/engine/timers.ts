@@ -16,8 +16,8 @@ export class IntervalTimer {
   }
 
   private tick() {
-    this.callback();
     this.tickId += 1;
+    this.callback();
 
     const targetTime = this.startedAt! + this.tickId * this.intervalMs;
     const now = performance.now();
@@ -25,7 +25,7 @@ export class IntervalTimer {
 
     if (delay < 0) {
       console.warn('IntervalTimer: empty tick');
-      delay = this.intervalMs;
+      delay = 1;
     }
 
     this.timeoutId = window.setTimeout(() => {
@@ -38,5 +38,9 @@ export class IntervalTimer {
       window.clearTimeout(this.timeoutId);
       this.timeoutId = undefined;
     }
+  }
+
+  getTickId(): number {
+    return this.tickId;
   }
 }
